@@ -1,6 +1,10 @@
 package tradespread
 
-import "time"
+import (
+	"time"
+)
+
+var PRECISION int
 
 type ActionType int
 
@@ -55,7 +59,7 @@ func GetQueueAveragePrice(position *DerivativePostion) float64 {
 		if totalQuantityExceedsPosition(sumOfQuantity+quantity, positionQuantity) {
 			remainingQuantity := positionQuantity - sumOfQuantity
 			sumOfQuantity += remainingQuantity
-			sumOfProducts += price * quantity
+			sumOfProducts += price * remainingQuantity
 			break
 		}
 		sumOfQuantity += quantity
