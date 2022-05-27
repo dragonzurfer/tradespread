@@ -23,7 +23,7 @@ type DerivativePostion interface {
 }
 
 type InputeLeg struct {
-	Positions []DerivativePostion
+	Positions []*DerivativePostion
 	TargetPNL float64
 }
 
@@ -69,11 +69,11 @@ func GetQueueAveragePrice(position *DerivativePostion) float64 {
 	return averagePrice
 }
 
-func setQueueAveragePositions(queueAveragePositions *[]QueueAveragePosition, positions *[]DerivativePostion) {
+func setQueueAveragePositions(queueAveragePositions *[]QueueAveragePosition, positions *[]*DerivativePostion) {
 	for _, position := range *positions {
-		avgPrice := GetQueueAveragePrice(&position)
+		avgPrice := GetQueueAveragePrice(position)
 		newAveragePosition := QueueAveragePosition{
-			Position:               position,
+			Position:               *position,
 			AverageExecutablePrice: avgPrice,
 		}
 		*queueAveragePositions = append(*queueAveragePositions, newAveragePosition)
