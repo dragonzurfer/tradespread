@@ -1,4 +1,4 @@
-// package tradespread
+package tradespread_test
 
 // import (
 // 	"encoding/json"
