@@ -1,6 +1,8 @@
 package tradespread
 
 import (
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -11,6 +13,13 @@ type ActionType int
 const (
 	Buy ActionType = iota
 	Sell
+)
+
+type QStatus int
+
+const (
+	NOT_ENOUGH_QUANTITY QStatus = iota
+	ENOUGH_QUANTITY
 )
 
 type DerivativePostion interface {
@@ -38,9 +47,9 @@ type QueueAveragePosition struct {
 
 func (q *QueueAveragePosition) GetPNL() float64 {
 	if q.Position.GetPositionType() == Buy {
-		return (q.AverageExecutablePrice - q.Position.GetAveragePrice()) * q.Position.GetQuantity()
+		return (q.AverageExecutablePrice - q.Position.GetAveragePrice()) * (q.Position.GetQuantity())
 	} else {
-		return (q.Position.GetAveragePrice() - q.AverageExecutablePrice) * q.Position.GetQuantity()
+		return (q.Position.GetAveragePrice() - q.AverageExecutablePrice) * (-1 * q.Position.GetQuantity())
 	}
 }
 
@@ -48,7 +57,7 @@ func totalQuantityExceedsPosition(currentQuantity, positionQuantity float64) boo
 	return (currentQuantity >= positionQuantity)
 }
 
-func GetQueueAveragePrice(position *DerivativePostion) float64 {
+func GetQueueAveragePrice(position *DerivativePostion) (float64, QStatus) {
 	queue := (*position).GetQueue()
 	positionQuantity := (*position).GetQuantity()
 	sumOfProducts := 0.0
@@ -66,18 +75,31 @@ func GetQueueAveragePrice(position *DerivativePostion) float64 {
 		sumOfProducts += price * quantity
 	}
 	averagePrice := sumOfProducts / sumOfQuantity
-	return averagePrice
+
+	if sumOfQuantity < positionQuantity {
+		return averagePrice, NOT_ENOUGH_QUANTITY
+	}
+
+	return averagePrice, ENOUGH_QUANTITY
 }
 
-func setQueueAveragePositions(queueAveragePositions *[]QueueAveragePosition, positions *[]*DerivativePostion) {
-	for _, position := range *positions {
-		avgPrice := GetQueueAveragePrice(position)
+func setQueueAveragePositions(positions []*DerivativePostion) ([]QueueAveragePosition, error) {
+
+	queueAveragePositions := make([]QueueAveragePosition, 0)
+
+	for _, position := range positions {
+		avgPrice, status := GetQueueAveragePrice(position)
+		if status == NOT_ENOUGH_QUANTITY {
+			empty := []QueueAveragePosition{}
+			return empty, errors.New("NOT_ENOUGH_QUANTITY")
+		}
 		newAveragePosition := QueueAveragePosition{
 			Position:               *position,
 			AverageExecutablePrice: avgPrice,
 		}
-		*queueAveragePositions = append(*queueAveragePositions, newAveragePosition)
+		queueAveragePositions = append(queueAveragePositions, newAveragePosition)
 	}
+	return queueAveragePositions, nil
 }
 
 func PNLSumofQueueAveragePositions(queueAveragePositions *[]QueueAveragePosition) float64 {
@@ -90,15 +112,15 @@ func PNLSumofQueueAveragePositions(queueAveragePositions *[]QueueAveragePosition
 
 func GetOrders(inputleg InputeLeg, queueUpdateInterval time.Duration) Orders {
 
-	// Get average prices
-	var queueAveragePositions []QueueAveragePosition
-
-	setQueueAveragePositions(&queueAveragePositions, &inputleg.Positions)
-
+	queueAveragePositions, _ := setQueueAveragePositions(inputleg.Positions)
+	var err error
 	// Loop tille target is achievable
 	for PNLSumofQueueAveragePositions(&queueAveragePositions) < inputleg.TargetPNL {
 		time.Sleep(queueUpdateInterval)
-		setQueueAveragePositions(&queueAveragePositions, &inputleg.Positions)
+		queueAveragePositions, err = setQueueAveragePositions(inputleg.Positions)
+		if err != nil {
+			fmt.Println("not enough quantity")
+		}
 	}
 
 	var orders Orders
