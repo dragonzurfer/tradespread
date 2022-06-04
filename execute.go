@@ -2,7 +2,6 @@ package tradespread
 
 import (
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -110,17 +109,18 @@ func PNLSumofQueueAveragePositions(queueAveragePositions *[]QueueAveragePosition
 	return PNLSum
 }
 
+func GetQueueAveragePositions(positions []*DerivativePostion) ([]QueueAveragePosition, error) {
+	queueAveragePositions, err := setQueueAveragePositions(positions)
+	return queueAveragePositions, err
+}
+
 func GetOrders(inputleg InputeLeg, queueUpdateInterval time.Duration) Orders {
 
 	queueAveragePositions, _ := setQueueAveragePositions(inputleg.Positions)
-	var err error
 	// Loop tille target is achievable
 	for PNLSumofQueueAveragePositions(&queueAveragePositions) < inputleg.TargetPNL {
 		time.Sleep(queueUpdateInterval)
-		queueAveragePositions, err = setQueueAveragePositions(inputleg.Positions)
-		if err != nil {
-			fmt.Println("not enough quantity")
-		}
+		queueAveragePositions, _ = setQueueAveragePositions(inputleg.Positions)
 	}
 
 	var orders Orders
